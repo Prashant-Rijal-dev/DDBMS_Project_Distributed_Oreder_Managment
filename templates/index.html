@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Distributed Order Management System</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --ink:#1c2330; --mute:#667085; --line:#e3e6ec;
+    --brand:#2f5bea; --brand-ink:#ffffff; --ok:#12805c; --okbg:#e3f5ed;
+    --bad:#b42318; --badbg:#fdeceb; --warn:#9a5b00; --warnbg:#fff3dc; --code:#10151f; --codeink:#d8e2f0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#10141c; --card:#182030; --ink:#e8edf6; --mute:#93a0b8; --line:#2a3550;
+      --brand:#6c8cff; --brand-ink:#0b1020; --ok:#4ade9d; --okbg:#12332a; --bad:#ff8a80; --badbg:#3a1a1a;
+      --warn:#ffc266; --warnbg:#3a2c10; --code:#0a0e16; --codeink:#cfd9ea; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  header h1{font-size:17px;margin:0}
+  header .sub{color:var(--mute);font-size:12px}
+  nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+  nav button{background:none;border:1px solid transparent;color:var(--mute);padding:7px 12px;border-radius:8px;cursor:pointer;font:inherit}
+  nav button.active{background:var(--brand);color:var(--brand-ink)}
+  nav button:not(.active):hover{border-color:var(--line);color:var(--ink)}
+  main{max-width:1250px;margin:0 auto;padding:20px 24px 60px}
+  .tab{display:none}.tab.active{display:block}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h2{font-size:15px;margin:0 0 2px}
+  .card h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin:16px 0 6px}
+  .meta{color:var(--mute);font-size:12px;margin-bottom:10px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--mute);font-weight:600;font-size:11.5px}
+  .scroll{overflow-x:auto}
+  tr.low td{background:var(--warnbg);color:var(--warn)}
+  tr.zero td{background:var(--badbg);color:var(--bad)}
+  .pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:600}
+  .pill.ok{background:var(--okbg);color:var(--ok)}
+  .pill.bad{background:var(--badbg);color:var(--bad)}
+  .pill.warn{background:var(--warnbg);color:var(--warn)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+  label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mute)}
+  select,input[type=number]{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;min-width:140px}
+  .chk{flex-direction:row;align-items:center;gap:6px;color:var(--ink)}
+  button.btn{background:var(--brand);color:var(--brand-ink);border:0;padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit;font-weight:600}
+  button.btn.sec{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  button.btn:disabled{opacity:.5;cursor:wait}
+  pre.out{background:var(--code);color:var(--codeink);padding:12px 14px;border-radius:10px;overflow:auto;max-height:520px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin:10px 0 0;white-space:pre}
+  .msg{padding:9px 12px;border-radius:8px;margin:8px 0;font-size:13px}
+  .msg.ok{background:var(--okbg);color:var(--ok)} .msg.bad{background:var(--badbg);color:var(--bad)} .msg.warn{background:var(--warnbg);color:var(--warn)}
+  .scn{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+  .scn:last-child{border:0}
+  .scn .n{width:28px;height:28px;border-radius:50%;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-weight:700;flex:none}
+  .scn .t{flex:1}
+  .scn .t small{display:block;color:var(--mute)}
+  .hint{color:var(--mute);font-size:12px;margin:4px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Distributed Order Management System</h1>
+    <div class="sub">3 PostgreSQL sites &middot; global catalog &middot; 2PC coordinator &middot; deadlock detector &middot; recovery</div>
+  </div>
+  <nav id="nav">
+    <button data-tab="overview" class="active">Sites</button>
+    <button data-tab="order">Place order</button>
+    <button data-tab="queries">Global queries</button>
+    <button data-tab="scenarios">Scenarios</button>
+    <button data-tab="catalog">Catalog &amp; log</button>
+  </nav>
+</header>
+
+<main>
+<!-- ============ SITES ============ -->
+<section class="tab active" id="tab-overview">
+  <div class="row">
+    <button class="btn sec" onclick="loadState()">Refresh</button>
+    <label class="chk"><input type="checkbox" id="auto"> auto-refresh every 4 s</label>
+    <button class="btn sec" onclick="resetData()">Reset sample data</button>
+    <span id="state-msg" class="hint"></span>
+  </div>
+  <div class="grid3" id="sites"></div>
+</section>
+
+<!-- ============ ORDER ============ -->
+<section class="tab" id="tab-order">
+  <div class="grid2">
+    <div class="card">
+      <h2>Place a distributed order</h2>
+      <div class="meta">The order is stored at the customer's home site. Stock is taken from the home warehouse, or from another site if the home warehouse is short, using two-phase commit.</div>
+      <div class="row">
+        <label>Customer <select id="o-cust"></select></label>
+        <label>Product <select id="o-prod"></select></label>
+        <label>Quantity <input type="number" id="o-qty" value="1" min="1" max="20" style="min-width:80px"></label>
+      </div>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="o-lock" checked> Use strict 2PL locking (<code>FOR UPDATE</code>)</label>
+      </div>
+      <div class="row">
+        <label>Failure injection
+          <select id="o-fail">
+            <option value="">None (normal commit)</option>
+            <option value="after_prepare">Coordinator crashes after PREPARE (no decision logged)</option>
+            <option value="after_decision">Coordinator crashes after logging COMMIT</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn" id="o-btn" onclick="placeOrder()">Place order</button>
+      <button class="btn sec" onclick="runRecovery()">Run recovery</button>
+      <div id="o-msg"></div>
+      <p class="hint">Try: customer 1001 (North) + <b>Smart Watch</b> (only the West has stock) to see a cross-site 2PC. Choose a crash option, then check the <b>Sites</b> tab for in-doubt transactions and click <b>Run recovery</b>.</p>
+    </div>
+    <div class="card">
+      <h2>Protocol trace</h2>
+      <div class="meta">Every step of the transaction, as the coordinator saw it.</div>
+      <pre class="out" id="o-trace">Nothing yet. Place an order.</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ QUERIES ============ -->
+<section class="tab" id="tab-queries">
+  <div class="card">
+    <h2>Global query processor</h2>
+    <div class="meta">Pick a global query. The processor decomposes it, localises it with the data dictionary, eliminates fragments, runs fragment queries in parallel and merges the answer.</div>
+    <div class="row">
+      <label>Query
+        <select id="q-key" onchange="qChange()">
+          <option value="Q1">Q1  Total sales per category</option>
+          <option value="Q2">Q2  Average order value per region</option>
+          <option value="Q3">Q3  Orders above a threshold</option>
+          <option value="Q4">Q4  Low-stock items</option>
+          <option value="Q5">Q5  Customers per region</option>
+        </select>
+      </label>
+      <label>Restrict to region
+        <select id="q-region">
+          <option value="">All regions</option><option value="N">North</option>
+          <option value="W">West</option><option value="S">South</option>
+        </select>
+      </label>
+      <label id="q-th-wrap" style="display:none">Threshold (INR) <input type="number" id="q-th" value="3000"></label>
+      <button class="btn" id="q-btn" onclick="runQuery()">Run</button>
+    </div>
+    <div id="q-msg"></div>
+    <div id="q-result"></div>
+    <pre class="out" id="q-steps" style="display:none"></pre>
+  </div>
+</section>
+
+<!-- ============ SCENARIOS ============ -->
+<section class="tab" id="tab-scenarios">
+  <div class="grid2">
+    <div class="card">
+      <h2>Demo scenarios</h2>
+      <div class="meta">Each button runs the same code as <code>python3 demo.py N</code>. Scenarios 4 and 5 deliberately wait a few seconds.</div>
+      {% for n, title in scenarios.items() %}
+      <div class="scn">
+        <div class="n">{{ n }}</div>
+        <div class="t">{{ title }}</div>
+        <button class="btn sec scn-btn" onclick="runScenario('{{ n }}', this)">Run</button>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="card">
+      <h2>Output</h2>
+      <div id="s-msg" class="meta">Choose a scenario.</div>
+      <pre class="out" id="s-out" style="max-height:680px">-</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CATALOG ============ -->
+<section class="tab" id="tab-catalog">
+  <div class="row"><button class="btn sec" onclick="loadCatalog()">Refresh</button></div>
+  <div class="grid2">
+    <div class="card">
+      <h2>Data dictionary: fragments and allocation</h2>
+      <div class="meta">Read from the <code>ddbms_catalog</code> database.</div>
+      <div class="scroll" id="cat"></div>
+    </div>
+    <div class="card">
+      <h2>Coordinator log (last 60 records)</h2>
+      <div class="meta">The write-ahead log used for recovery. Look for BEGIN / PREPARE_START / VOTE / DECISION / END.</div>
+      <div class="scroll" id="log"></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function api(path, body){
+  const opt = body === undefined ? {} : {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)};
+  try { const r = await fetch(path, opt); return await r.json(); }
+  catch(e){ return {ok:false, error:'Cannot reach the server: ' + e}; }
+}
+function tbl(cols, rows, rowCls){
+  if(!rows.length) return '<div class="hint">No rows.</div>';
+  const th = cols.map(c => `<th>${esc(c.label)}</th>`).join('');
+  const tr = rows.map(r => `<tr class="${rowCls ? rowCls(r) : ''}">` + cols.map(c => `<td>${esc(r[c.key])}</td>`).join('') + '</tr>').join('');
+  return `<div class="scroll"><table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table></div>`;
+}
+function say(el, kind, text){ el.innerHTML = text ? `<div class="msg ${kind}">${esc(text)}</div>` : ''; }
+
+/* ---- tabs ---- */
+document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#nav button').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-' + b.dataset.tab));
+  if(b.dataset.tab === 'catalog') loadCatalog();
+  if(b.dataset.tab === 'overview') loadState();
+});
+
+/* ---- sites ---- */
+let prodList = [];
+async function loadState(){
+  const d = await api('/api/state');
+  const msg = $('#state-msg');
+  if(!d.ok){ msg.textContent = 'Error: ' + d.error; return; }
+  msg.textContent = 'Updated ' + new Date().toLocaleTimeString();
+  prodList = d.sites[0].inventory.map(i => ({id:i.prod_id, name:i.name}));
+  fillProducts();
+  $('#sites').innerHTML = d.sites.map(s => {
+    const pend = s.prepared.length
+      ? `<span class="pill bad">${s.prepared.length} in-doubt transaction(s)</span>`
+      : `<span class="pill ok">no in-doubt transactions</span>`;
+    const open = s.restocks.filter(r => r.status === 'OPEN').length;
+    return `<div class="card">
+      <h2>${esc(s.name)}</h2>
+      <div class="meta">${esc(s.db)} &middot; ${s.order_count} orders &middot; ${open} open restock request(s)</div>
+      ${pend}
+      ${s.prepared.length ? `<div class="hint">${s.prepared.map(esc).join(', ')}</div>` : ''}
+      <h3>Inventory (this site's warehouse)</h3>
+      ${tbl([{key:'prod_id',label:'Product'},{key:'name',label:'Name'},{key:'stock',label:'Stock'},{key:'reorder_level',label:'Reorder at'}],
+            s.inventory, r => r.stock == 0 ? 'zero' : (r.stock < r.reorder_level ? 'low' : ''))}
+      <h3>Latest orders</h3>
+      ${tbl([{key:'order_id',label:'Order'},{key:'cust_id',label:'Customer'},{key:'order_date',label:'Date'},{key:'status',label:'Status'}], s.orders)}
+      <h3>Restock requests (trigger)</h3>
+      ${tbl([{key:'req_id',label:'#'},{key:'prod_id',label:'Product'},{key:'qty_requested',label:'Qty'},{key:'status',label:'Status'}], s.restocks)}
+    </div>`;
+  }).join('');
+}
+async function resetData(){
+  if(!confirm('Reload the sample data at all sites? Current orders and stock changes will be lost.')) return;
+  const d = await api('/api/reset', {});
+  $('#state-msg').textContent = d.ok ? 'Data reset.' : 'Error: ' + d.error;
+  loadState();
+}
+let timer = null;
+$('#auto').onchange = e => { clearInterval(timer); if(e.target.checked) timer = setInterval(loadState, 4000); };
+
+/* ---- order ---- */
+async function loadCustomers(){
+  const d = await api('/api/customers');
+  if(!d.ok) return;
+  $('#o-cust').innerHTML = d.customers.map(c => `<option value="${c.cust_id}">${c.cust_id} ${esc(c.name)} (${esc(c.site)})</option>`).join('');
+}
+function fillProducts(){
+  const sel = $('#o-prod'); if(!sel || sel.options.length) return;
+  sel.innerHTML = prodList.map(p => `<option value="${p.id}">${p.id} ${esc(p.name)}</option>`).join('');
+}
+async function placeOrder(){
+  const btn = $('#o-btn'); btn.disabled = true;
+  $('#o-trace').textContent = 'Running ...';
+  const d = await api('/api/order', {cust_id:$('#o-cust').value, prod_id:$('#o-prod').value, qty:$('#o-qty').value,
+                                     use_locking:$('#o-lock').checked, fail_at:$('#o-fail').value});
+  btn.disabled = false;
+  $('#o-trace').textContent = (d.trace || []).join('\n') || '(no trace)';
+  if(d.ok) say($('#o-msg'), 'ok', `Order ${d.result.order_id} committed. Sites involved: ${d.result.sites.join(', ')}.`);
+  else say($('#o-msg'), d.crashed ? 'warn' : 'bad', d.error);
+  loadState();
+}
+async function runRecovery(){
+  const d = await api('/api/recover', {});
+  $('#o-trace').textContent = d.ok ? 'RECOVERY\n' + d.lines.join('\n') : 'Recovery error: ' + d.error;
+  say($('#o-msg'), d.ok ? 'ok' : 'bad', d.ok ? 'Recovery finished.' : d.error);
+  loadState();
+}
+
+/* ---- queries ---- */
+function qChange(){ $('#q-th-wrap').style.display = $('#q-key').value === 'Q3' ? '' : 'none'; if($('#q-key').value==='Q3') $('#q-region').value = 'N'; }
+async function runQuery(){
+  const btn = $('#q-btn'); btn.disabled = true; say($('#q-msg'), '', '');
+  const d = await api('/api/query', {key:$('#q-key').value, region:$('#q-region').value, threshold:$('#q-th').value});
+  btn.disabled = false;
+  const steps = $('#q-steps');
+  steps.style.display = d.steps ? '' : 'none'; steps.textContent = d.steps || '';
+  if(!d.ok){ say($('#q-msg'), 'bad', d.error); $('#q-result').innerHTML = ''; return; }
+  $('#q-result').innerHTML = '<h3 style="margin:10px 0 6px;font-size:12px;text-transform:uppercase;color:var(--mute)">Merged result</h3>'
+    + tbl(d.headers.map((h,i) => ({key:i,label:h})), d.rows);
+}
+
+/* ---- scenarios ---- */
+async function runScenario(n, btn){
+  document.querySelectorAll('.scn-btn').forEach(b => b.disabled = true);
+  $('#s-msg').textContent = `Running scenario ${n} ... (can take up to a minute)`;
+  $('#s-out').textContent = '...';
+  const d = await api('/api/scenario', {n});
+  document.querySelectorAll('.scn-btn').forEach(b => b.disabled = false);
+  $('#s-msg').textContent = d.ok ? `Scenario ${n} finished.` : `Scenario ${n} failed: ${d.error || 'see output'}`;
+  $('#s-out').textContent = d.output || d.error || '';
+}
+
+/* ---- catalog & log ---- */
+async function loadCatalog(){
+  const c = await api('/api/catalog');
+  $('#cat').innerHTML = c.ok ? tbl([{key:'frag_name',label:'Fragment'},{key:'frag_type',label:'Type'},{key:'predicate',label:'Predicate'},
+                                    {key:'columns',label:'Columns'},{key:'site',label:'Site'},{key:'local_table',label:'Local table'}], c.rows)
+                              : `<div class="msg bad">${esc(c.error)}</div>`;
+  const l = await api('/api/log');
+  $('#log').innerHTML = l.ok ? tbl([{key:'ts',label:'Time'},{key:'txn',label:'Txn'},{key:'event',label:'Record'},{key:'details',label:'Details'}], l.rows)
+                             : `<div class="msg bad">${esc(l.error)}</div>`;
+}
+
+loadState(); loadCustomers(); qChange();
+</script>
+</body>
+</html>
